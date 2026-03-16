@@ -1,7 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[2]:
 
 
 import os
@@ -25,6 +21,7 @@ df["Week"] = df["Transaction_Date"].dt.to_period("W").dt.start_time
 locations = sorted(df["Location"].dropna().unique().tolist())
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server
 app.title = "ECAP Store"
 
 BG = "#EAF3FB"
@@ -263,7 +260,10 @@ def update_dashboard(loc, q):
 
 
 
-# execution de l'app
-if __name__ == "__main__":
-    app.run(debug=True, port=8051, jupyter_mode="external")
+import os
 
+server = app.server
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host="0.0.0.0", port=port, debug=False)
