@@ -1,269 +1,335 @@
 
 
-import os
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, dash_table, Input, Output
 import dash_bootstrap_components as dbc
 
+
+# data
 df = pd.read_csv("data.csv")
 
+# colonnes utiles
+cols_utiles = [
+    "CustomerID", "Gender", "Location", "Product_Category",
+    "Quantity", "Avg_Price", "Transaction_Date", "Month", "Discount_pct"
+]
+cols_utiles = [c for c in cols_utiles if c in df.columns]
+df = df[cols_utiles].copy()
+
+# CustomerID
+if "CustomerID" in df.columns:
+    df["CustomerID"] = df["CustomerID"].fillna(0).astype(int)
+
+# dates
 df["Transaction_Date"] = pd.to_datetime(df["Transaction_Date"], errors="coerce")
 df = df.dropna(subset=["Transaction_Date"]).copy()
 
+# mois
 if "Month" not in df.columns:
     df["Month"] = df["Transaction_Date"].dt.month
 df["Month"] = df["Month"].astype(int)
 
-df["Chiffre_affaire"] = df["Quantity"] * df["Avg_Price"] * (1 - df["Discount_pct"] / 100)
+# chiffre d'affaire ligne
+df["Total_price"] = df["Quantity"] * df["Avg_Price"] * (1 - df["Discount_pct"] / 100)
+df["Chiffre_affaire"] = df["Total_price"]
+
+# semaine
 df["Week"] = df["Transaction_Date"].dt.to_period("W").dt.start_time
 
+# liste des zones
 locations = sorted(df["Location"].dropna().unique().tolist())
+
+
+# fonctions
+def frequence_meilleure_vente(data, top=10, ascending=False):
+    result = (
+        data.groupby("Product_Category")["Quantity"]
+        .sum()
+        .sort_values(ascending=ascending)
+        .head(top)
+    )
+    return result
+
+def chiffre_affaire(data):
+    CA = (data["Quantity"] * data["Avg_Price"] * (1 - data["Discount_pct"] / 100)).sum()
+    return CA
+
+def ca_par_mois(data, mois):
+    d = data[data["Month"] == mois]
+    CA = (d["Quantity"] * d["Avg_Price"] * (1 - d["Discount_pct"] / 100)).sum()
+    return CA
+
+def indicateur_du_mois(data, mois):
+    d = data[data["Month"] == mois]
+    CA = (d["Quantity"] * d["Avg_Price"] * (1 - d["Discount_pct"] / 100)).sum()
+    return CA
+
+def barplot_top10_ventes(data, top=10, ascending=False):
+    totals = (
+        data.groupby("Product_Category")["Quantity"]
+        .sum()
+        .sort_values(ascending=ascending)
+        .head(top)
+    )
+
+    tmp = (
+        data[data["Product_Category"].isin(totals.index)]
+        .groupby(["Product_Category", "Gender"])["Quantity"]
+        .sum()
+        .reset_index()
+        if "Gender" in data.columns
+        else data[data["Product_Category"].isin(totals.index)]
+             .groupby(["Product_Category"])["Quantity"]
+             .sum()
+             .reset_index()
+    )
+
+    order = list(totals.index)
+
+    if "Gender" in tmp.columns:
+        fig = px.bar(
+            tmp,
+            x="Quantity",
+            y="Product_Category",
+            color="Gender",
+            orientation="h",
+            barmode="group",
+            category_orders={"Product_Category": order},
+            labels={"Quantity": "Total ventes", "Product_Category": ""}
+        )
+    else:
+        fig = px.bar(
+            tmp,
+            x="Quantity",
+            y="Product_Category",
+            orientation="h",
+            category_orders={"Product_Category": order},
+            labels={"Quantity": "Total ventes", "Product_Category": ""}
+        )
+
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    return fig
+
+def plot_evolution_chiffre_affaire(data):
+    if "Week" in data.columns:
+        evolution = (
+            data.groupby("Week")["Chiffre_affaire"]
+            .sum()
+            .reset_index()
+            .sort_values("Week")
+        )
+        fig = px.line(
+            evolution,
+            x="Week",
+            y="Chiffre_affaire",
+            labels={"Week": "Semaine", "Chiffre_affaire": "Chiffre d’affaire"}
+        )
+    else:
+        evolution = (
+            data.groupby("Month")["Chiffre_affaire"]
+            .sum()
+            .reset_index()
+            .sort_values("Month")
+        )
+        fig = px.line(
+            evolution,
+            x="Month",
+            y="Chiffre_affaire",
+            labels={"Month": "Mois", "Chiffre_affaire": "Chiffre d’affaire"}
+        )
+
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    return fig
+
+def plot_chiffre_affaire_mois(data):
+    ca_mois_ = (
+        data.groupby("Month")["Chiffre_affaire"]
+        .sum()
+        .reset_index()
+        .sort_values("Month")
+    )
+    fig = px.bar(
+        ca_mois_,
+        x="Month",
+        y="Chiffre_affaire",
+        labels={"Month": "Mois", "Chiffre_affaire": "Chiffre d’affaire"}
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    return fig
+
+def plot_ventes_mois(data):
+    ventes_mois = (
+        data.groupby("Month")["Quantity"]
+        .sum()
+        .reset_index()
+        .sort_values("Month")
+    )
+    fig = px.bar(
+        ventes_mois,
+        x="Month",
+        y="Quantity",
+        labels={"Month": "Mois", "Quantity": "Total ventes"}
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    return fig
+
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
-app.title = "ECAP Store"
+app.title = "ECAP Boutique"
 
-BG = "#EAF3FB"
-CARD_BG = "white"
-TEXT_MUTED = "#6b7280"
+app.layout = dbc.Container([
 
+    # ligne titre + filtre
+    dbc.Row([
+        # colonne titre
+        dbc.Col(
+            html.H3("ECAP Store", style={"fontWeight": "bold", "marginTop": "10px"}),
+            md=6
+        ),
 
-def format_k(x):
-    return f"{x/1000:.0f}k" if abs(x) >= 1000 else f"{x:.0f}"
-
-
-def make_card(title, value, delta, color):
-    return dbc.Card(
-        dbc.CardBody([
-            html.Div(title, style={"fontSize": "13px", "color": TEXT_MUTED}),
-            html.Div(value, style={"fontSize": "42px", "fontWeight": "800", "lineHeight": "1.0"}),
-            html.Div(delta, style={"fontSize": "13px", "fontWeight": "700", "color": color}),
-        ]),
-        style={
-            "backgroundColor": CARD_BG,
-            "border": "0",
-            "borderRadius": "14px",
-            "boxShadow": "0 10px 24px rgba(0,0,0,0.08)",
-        }
-    )
-
-
-def make_panel(title, content, extra_style=None):
-    style = {
-        "backgroundColor": CARD_BG,
-        "border": "0",
-        "borderRadius": "14px",
-        "boxShadow": "0 10px 24px rgba(0,0,0,0.08)",
-    }
-    if extra_style:
-        style.update(extra_style)
-
-    return dbc.Card(
-        dbc.CardBody([
-            html.Div(title, style={"fontWeight": "800", "marginBottom": "6px"}),
-            content
-        ]),
-        style=style
-    )
-
-
-app.layout = dbc.Container(
-    style={"backgroundColor": BG, "minHeight": "100vh", "padding": "18px"},
-    children=[
-        dbc.Row([
-            dbc.Col(
-                html.Div("ECAP Store", style={"fontSize": "18px", "fontWeight": "900"}),
-                width=6
-            ),
-            dbc.Col(
-                html.Div([
-                    html.Div(
-                        "Choisissez une zone",
-                        style={"fontSize": "12px", "color": TEXT_MUTED, "marginBottom": "4px"}
-                    ),
-                    dcc.Dropdown(
-                        id="loc-dd",
-                        options=[{"label": "All", "value": "All"}] + [{"label": x, "value": x} for x in locations],
-                        value="All",
-                        clearable=False
-                    ),
-                ], style={"maxWidth": "320px", "marginLeft": "auto"}),
-                width=6
+        # colonne filtre zone
+        dbc.Col([
+            html.Label("Choisissez une zone"),
+            dcc.Dropdown(
+                id="zone",
+                options=[{"label": "All", "value": "All"}] + [{"label": x, "value": x} for x in locations],
+                value="All",
+                clearable=False
             )
-        ], align="center", className="mb-3"),
+        ], md=4)
+    ], className="mb-3"),
 
-        dbc.Row([
-            dbc.Col([
-                dbc.Row([
-                    dbc.Col(html.Div(id="kpi1"), md=6),
-                    dbc.Col(html.Div(id="kpi2"), md=6),
-                ], className="g-3 mb-3"),
+    dbc.Row([
 
-                make_panel(
-                    "Fréquence des 10 meilleures ventes",
-                    dcc.Graph(
-                        id="bar-top10",
-                        config={"displayModeBar": False},
-                        style={"height": "310px"}
+        # colonne gauche
+        dbc.Col([
+
+            # colonne cartes
+            dbc.Row([
+                # colonne carte CA
+                dbc.Col(
+                    dbc.Card(
+                        dbc.CardBody([
+                            html.P("December"),
+                            html.H1(id="carte_ca"),
+                            html.H5(id="var_ca")
+                        ])
                     ),
-                    extra_style={"marginTop": "26px"}
-                )
-            ], md=5),
-
-            dbc.Col([
-                make_panel(
-                    "Évolution du chiffre d’affaire par semaine",
-                    dcc.Graph(
-                        id="line-week",
-                        config={"displayModeBar": False},
-                        style={"height": "320px"}
-                    )
+                    md=6
                 ),
-                html.Div(style={"height": "12px"}),
-                make_panel(
-                    "Table des 100 dernières ventes",
-                    html.Div([
-                        dcc.Input(
-                            id="table-filter",
-                            placeholder="filtrer...",
-                            type="text",
-                            style={
-                                "width": "220px",
-                                "padding": "6px 10px",
-                                "borderRadius": "10px",
-                                "border": "1px solid #d1d5db",
-                                "marginBottom": "10px"
-                            }
-                        ),
-                        dash_table.DataTable(
-                            id="sales-table",
-                            page_size=10,
-                            sort_action="native",
-                            style_table={"overflowX": "auto"},
-                            style_header={"backgroundColor": "#f3f4f6", "fontWeight": "800"},
-                            style_cell={"fontFamily": "Arial", "fontSize": "12px", "padding": "8px"},
-                        )
-                    ])
+
+                # colonne carte ventes
+                dbc.Col(
+                    dbc.Card(
+                        dbc.CardBody([
+                            html.P("December"),
+                            html.H1(id="carte_nb"),
+                            html.H5(id="var_nb")
+                        ])
+                    ),
+                    md=6
                 )
-            ], md=7)
-        ], className="g-3")
-    ]
-)
+            ], className="mb-3"),
+
+            # colonne top 10
+            dbc.Card(
+                dbc.CardBody([
+                    html.H4("Fréquence des 10 meilleures ventes"),
+                    dcc.Graph(id="graph_top10")
+                ])
+            )
+        ], md=5),
+
+        # colonne droite
+        dbc.Col([
+
+            # colonne courbe CA
+            dbc.Card(
+                dbc.CardBody([
+                    html.H4("Évolution du chiffre d'affaire par semaine"),
+                    dcc.Graph(id="graph_ca")
+                ])
+            ),
+
+            html.Br(),
+
+            # colonne table
+            dbc.Card(
+                dbc.CardBody([
+                    html.H4("Table des 100 dernières ventes"),
+                    dash_table.DataTable(
+                        id="table_ventes",
+                        page_size=10,
+                        style_table={"overflowX": "auto"},
+                        style_cell={"textAlign": "center"},
+                        style_header={"fontWeight": "bold"}
+                    )
+                ])
+            )
+        ], md=7)
+
+    ])
+], fluid=True)
 
 
 @app.callback(
-    Output("kpi1", "children"),
-    Output("kpi2", "children"),
-    Output("bar-top10", "figure"),
-    Output("line-week", "figure"),
-    Output("sales-table", "data"),
-    Output("sales-table", "columns"),
-    Input("loc-dd", "value"),
-    Input("table-filter", "value")
+    Output("carte_ca", "children"),
+    Output("var_ca", "children"),
+    Output("carte_nb", "children"),
+    Output("var_nb", "children"),
+    Output("graph_top10", "figure"),
+    Output("graph_ca", "figure"),
+    Output("table_ventes", "data"),
+    Output("table_ventes", "columns"),
+    Input("zone", "value")
 )
-def update_dashboard(loc, q):
-    if loc != "All":
-        dloc = df[df["Location"] == loc].copy()
+def mettre_a_jour(zone):
+
+    # colonne filtre des données
+    if zone == "All":
+        dff = df.copy()
     else:
-        dloc = df.copy()
+        dff = df[df["Location"] == zone].copy()
 
-    dec = dloc[dloc["Month"] == 12].copy()
-    nov = dloc[dloc["Month"] == 11].copy()
+    # colonne carte CA décembre
+    ca_dec = ca_par_mois(dff, 12)
+    ca_nov = ca_par_mois(dff, 11)
+    diff_ca = ca_dec - ca_nov
 
-    ca_dec = dec["Chiffre_affaire"].sum()
-    ca_nov = nov["Chiffre_affaire"].sum()
-    delta_ca = ca_dec - ca_nov
+    # colonne carte nombre décembre
+    nb_dec = len(dff[dff["Month"] == 12])
+    nb_nov = len(dff[dff["Month"] == 11])
+    diff_nb = nb_dec - nb_nov
 
-    if "Transaction_ID" in dec.columns:
-        n_dec = dec["Transaction_ID"].nunique()
-        n_nov = nov["Transaction_ID"].nunique()
-    else:
-        n_dec = len(dec)
-        n_nov = len(nov)
+    # colonne texte variation CA
+    texte_ca = str(round(diff_ca, 0))
 
-    delta_n = n_dec - n_nov
+    # colonne texte variation nombre
+    texte_nb = str(diff_nb)
 
-    txt_ca = f"▲ {format_k(delta_ca)}" if delta_ca >= 0 else f"▼ {format_k(delta_ca)}"
-    txt_n = f"▲ {delta_n}" if delta_n >= 0 else f"▼ {delta_n}"
+    # colonne graphe top 10
+    fig_top10 = barplot_top10_ventes(dff[dff["Month"] == 12])
 
-    kpi1 = make_card("December", format_k(ca_dec), txt_ca, "green" if delta_ca >= 0 else "red")
-    kpi2 = make_card("December", f"{n_dec}", txt_n, "green" if delta_n >= 0 else "red")
+    # colonne graphe évolution CA
+    fig_ca = plot_evolution_chiffre_affaire(dff)
 
-    d = dec
-    prod_col = "Product_Description" if "Product_Description" in d.columns else "Product_Category"
+    # colonne table des ventes
+    table = dff.sort_values("Transaction_Date", ascending=False).head(100).copy()
 
-    totals = d.groupby(prod_col)["Quantity"].sum().sort_values(ascending=False)
-    top10 = totals.head(10).index.tolist()
-
-    top = (
-        d[d[prod_col].isin(top10)]
-        .groupby([prod_col, "Gender"])["Quantity"]
-        .sum()
-        .reset_index()
-    )
-
-    order_asc = totals.loc[top10].sort_values(ascending=True).index.tolist()
-
-    fig_bar = px.bar(
-        top,
-        x="Quantity",
-        y=prod_col,
-        color="Gender",
-        orientation="h",
-        barmode="group",
-        category_orders={prod_col: order_asc}
-    )
-    fig_bar.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-
-    weekly = (
-        dloc.groupby("Week")["Chiffre_affaire"]
-        .sum()
-        .reset_index()
-        .sort_values("Week")
-    )
-
-    fig_line = px.line(weekly, x="Week", y="Chiffre_affaire")
-    fig_line.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-
-    cols = [
-        "Transaction_Date",
-        "Gender",
-        "Location",
-        "Product_Category",
-        "Quantity",
-        "Avg_Price",
-        "Discount_pct"
+    colonnes_table = [
+        "Transaction_Date", "Gender", "Location",
+        "Product_Category", "Quantity", "Avg_Price", "Discount_pct"
     ]
+    colonnes_table = [c for c in colonnes_table if c in table.columns]
+    table = table[colonnes_table]
 
-    t = d.sort_values("Transaction_Date", ascending=False).head(100).copy()
+    data = table.to_dict("records")
+    columns = [{"name": c, "id": c} for c in table.columns]
 
-    if q and str(q).strip():
-        qq = str(q).strip().lower()
-        mask = t[cols].astype(str).apply(lambda row: qq in " ".join(row.values).lower(), axis=1)
-        t = t[mask]
-
-    t["Transaction_Date"] = t["Transaction_Date"].dt.strftime("%Y-%m-%d")
-
-    t = t[cols].rename(columns={
-        "Transaction_Date": "Date",
-        "Product_Category": "Product Category",
-        "Avg_Price": "Avg Price",
-        "Discount_pct": "Discount Pct"
-    })
-
-    data = t.to_dict("records")
-    columns = [{"name": c, "id": c} for c in t.columns]
-
-    return kpi1, kpi2, fig_bar, fig_line, data, columns
+    return round(ca_dec, 0), texte_ca, nb_dec, texte_nb, fig_top10, fig_ca, data, columns
 
 
-
-
-import os
-
-server = app.server
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8050))
-    app.run(host="0.0.0.0", port=port, debug=False)
+if __name__ == '__main__':
+    app.run_server(debug=True)
