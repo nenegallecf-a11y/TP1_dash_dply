@@ -92,7 +92,7 @@ def barplot_top10_ventes(data, top=10, ascending=False):
             tmp,
             x="Quantity",
             y="Product_Category",
-            color="Gender",
+            color = {"F": "blue", "M": "pink"},
             orientation="h",
             barmode="group",
             category_orders={"Product_Category": order},
