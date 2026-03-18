@@ -92,7 +92,8 @@ def barplot_top10_ventes(data, top=10, ascending=False):
             tmp,
             x="Quantity",
             y="Product_Category",
-            color = {"F": "blue", "M": "pink"},
+            color="Gender",
+            color_discrete_map={"M": "blue", "F": "pink"},
             orientation="h",
             barmode="group",
             category_orders={"Product_Category": order},
@@ -277,8 +278,10 @@ app.layout = dbc.Container([
 @app.callback(
     Output("carte_ca", "children"),
     Output("var_ca", "children"),
+    Output("var_ca", "style"),
     Output("carte_nb", "children"),
     Output("var_nb", "children"),
+    Output("var_nb", "style"),
     Output("graph_top10", "figure"),
     Output("graph_ca", "figure"),
     Output("table_ventes", "data"),
@@ -304,10 +307,20 @@ def mettre_a_jour(zone):
     diff_nb = nb_dec - nb_nov
 
     # colonne texte variation CA
-    texte_ca = str(round(diff_ca, 0))
+    if diff_ca < 0:
+        texte_ca = "▼ " + str(round(diff_ca, 0))
+        style_ca = {"color": "red"}
+    else:
+        texte_ca = "▲ " + str(round(diff_ca, 0))
+        style_ca = {"color": "green"}
 
     # colonne texte variation nombre
-    texte_nb = str(diff_nb)
+    if diff_nb < 0:
+        texte_nb = "▼ " + str(diff_nb)
+        style_nb = {"color": "red"}
+    else:
+        texte_nb = "▲ " + str(diff_nb)
+        style_nb = {"color": "green"}
 
     # colonne graphe top 10
     fig_top10 = barplot_top10_ventes(dff[dff["Month"] == 12])
@@ -328,7 +341,7 @@ def mettre_a_jour(zone):
     data = table.to_dict("records")
     columns = [{"name": c, "id": c} for c in table.columns]
 
-    return round(ca_dec, 0), texte_ca, nb_dec, texte_nb, fig_top10, fig_ca, data, columns
+    return round(ca_dec, 0), texte_ca, style_ca, nb_dec, texte_nb, style_nb, fig_top10, fig_ca, data, columns
 
 
 if __name__ == '__main__':
