@@ -1,10 +1,9 @@
 
 
-# TP1 de LY Néné Gallé etudiante M1-ECAP
-# création d'un dashboard de vente pour une boutique fictive "ECAP Boutique" 
-# Professeur : Mr Abdoul Razac Sane 
+# TP1 de LY Néné Gallé étudiante M1-ECAP Nantes Université
+# Création d'un dashboard de vente pour une boutique fictive "ECAP Boutique"
+# Professeur : Mr Abdoul Razac Sane
 # librairies utilisées : pandas, plotly, dash, dash_bootstrap_components
-
 
 import pandas as pd
 import plotly.express as px
@@ -12,10 +11,10 @@ from dash import Dash, dcc, html, dash_table, Input, Output
 import dash_bootstrap_components as dbc
 
 
-# Jeu de données 
+#J'importe le  Jeu de données
 df = pd.read_csv("data.csv")
 
-# colonnes utiles
+# colonnes que j'ai utilisées pour le dashboard (je les filtre pour éviter les erreurs si jamais une colonne est manquante)
 cols_utiles = [
     "CustomerID", "Gender", "Location", "Product_Category",
     "Quantity", "Avg_Price", "Transaction_Date", "Month", "Discount_pct"
@@ -23,7 +22,7 @@ cols_utiles = [
 cols_utiles = [c for c in cols_utiles if c in df.columns]
 df = df[cols_utiles].copy()
 
-# Client     
+# Client
 if "CustomerID" in df.columns:
     df["CustomerID"] = df["CustomerID"].fillna(0).astype(int)
 
@@ -47,7 +46,35 @@ df["Week"] = df["Transaction_Date"].dt.to_period("W").dt.start_time
 locations = sorted(df["Location"].dropna().unique().tolist())
 
 
-# on dénit les fonctions de calculs et graphiques ( Vu en cours) 
+
+# COULEURS ET STYLES
+
+BLEU_NUIT = "#0B1F3A"
+BLEU_NUIT_CLAIR = "#12345A"
+BLANC = "white"
+
+style_titre_section = {
+    "backgroundColor": BLEU_NUIT,
+    "color": BLANC,
+    "borderRadius": "999px",
+    "padding": "10px 25px",
+    "display": "inline-block",
+    "fontWeight": "bold",
+    "fontSize": "18px",
+    "marginBottom": "15px",
+    "boxShadow": "0 4px 10px rgba(0,0,0,0.20)"
+}
+# je définis les tyle pour les cartes KPI
+style_carte_kpi = {
+    "background": "linear-gradient(135deg, #0B1F3A, #12345A)",
+    "border": "none",
+    "borderRadius": "60px",
+    "boxShadow": "0 6px 14px rgba(0,0,0,0.25)",
+    "padding": "10px"
+}
+
+
+# ici je définis les fonctions de calculs et graphiques comme vu en cours 
 def frequence_meilleure_vente(data, top=10, ascending=False):
     result = (
         data.groupby("Product_Category")["Quantity"]
@@ -57,19 +84,23 @@ def frequence_meilleure_vente(data, top=10, ascending=False):
     )
     return result
 
+
 def chiffre_affaire(data):
     CA = (data["Quantity"] * data["Avg_Price"] * (1 - data["Discount_pct"] / 100)).sum()
     return CA
+
 
 def ca_par_mois(data, mois):
     d = data[data["Month"] == mois]
     CA = (d["Quantity"] * d["Avg_Price"] * (1 - d["Discount_pct"] / 100)).sum()
     return CA
 
+
 def indicateur_du_mois(data, mois):
     d = data[data["Month"] == mois]
     CA = (d["Quantity"] * d["Avg_Price"] * (1 - d["Discount_pct"] / 100)).sum()
     return CA
+
 
 def barplot_top10_ventes(data, top=10, ascending=False):
     totals = (
@@ -115,8 +146,13 @@ def barplot_top10_ventes(data, top=10, ascending=False):
             labels={"Quantity": "Total ventes", "Product_Category": ""}
         )
 
-    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    fig.update_layout(
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
     return fig
+
 
 def plot_evolution_chiffre_affaire(data):
     if "Week" in data.columns:
@@ -146,8 +182,13 @@ def plot_evolution_chiffre_affaire(data):
             labels={"Month": "Mois", "Chiffre_affaire": "Chiffre d’affaire"}
         )
 
-    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    fig.update_layout(
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
     return fig
+
 
 def plot_chiffre_affaire_mois(data):
     ca_mois_ = (
@@ -162,8 +203,13 @@ def plot_chiffre_affaire_mois(data):
         y="Chiffre_affaire",
         labels={"Month": "Mois", "Chiffre_affaire": "Chiffre d’affaire"}
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    fig.update_layout(
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
     return fig
+
 
 def plot_ventes_mois(data):
     ventes_mois = (
@@ -178,27 +224,42 @@ def plot_ventes_mois(data):
         y="Quantity",
         labels={"Month": "Mois", "Quantity": "Total ventes"}
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    fig.update_layout(
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
     return fig
 
-# conception du dashbord interactif 
+
+# conception du dashboard interactif
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server
+server = app.server # pour le déploiement sur Render 
 app.title = "ECAP Boutique"
 
 app.layout = dbc.Container([
 
     # ligne titre + filtre
+    # ici on utilise 2 colonnes : une pour le titre et une pour le dropdown de sélection de la zone
+    # J'ai ajouté un style pour le titre pour le rendre plus visible et moderne, et j'ai mis un style simple pour le dropdown
     dbc.Row([
-        #  titre
         dbc.Col(
-            html.H3("ECAP Boutique", style={"fontWeight": "bold", "marginTop": "10px", "color": "white"}),
-            md=6
-        ),
-
-        # filtre zone
+            html.H1(
+    "ECAP Boutique",
+    style={
+        "fontWeight": "bold",
+        "fontSize": "42px",  
+        "color": "#87CEEB",  
+        "fontFamily": "Segoe UI, Arial, sans-serif",  
+        "letterSpacing": "2px",
+        "textTransform": "uppercase",
+        "textShadow": "2px 2px 8px rgba(0,0,0,0.4)",  
+        "marginTop": "10px"
+    }
+), md=8),
+         # colonne du dropdown pour choisir la zone
         dbc.Col([
-            html.Label("Choisissez une zone", style={"color": "white"}),
+            html.Label("Choisissez une zone", style={"color": "white", "fontWeight": "bold"}),
             dcc.Dropdown(
                 id="zone",
                 options=[{"label": "All", "value": "All"}] + [{"label": x, "value": x} for x in locations],
@@ -206,83 +267,121 @@ app.layout = dbc.Container([
                 clearable=False
             )
         ], md=4)
-    ], className="mb-3"),
+    ], className="mb-4"),
 
     dbc.Row([
 
-        # Partie Gauche de la page 
+        # Partie gauche pour les KPI et le top 10
         dbc.Col([
 
-            #  cartes
+            # cartes KPI
             dbc.Row([
-                # carte CA
                 dbc.Col(
                     dbc.Card(
                         dbc.CardBody([
-                            html.P("December"),
-                            html.H6("Chiffre d'affaires", style={"fontWeight": "bold"}),
-                            html.H1(id="carte_ca"),
-                            html.H5(id="var_ca")
-                        ])
+                            html.P("Décembre", style={
+                                "color": "white",
+                                "textAlign": "center",
+                                "marginBottom": "5px"
+                            }),
+                            html.H6("Chiffre d'affaires", style={
+                                "fontWeight": "bold",
+                                "color": "white",
+                                "textAlign": "center"
+                            }),
+                            html.H1(id="carte_ca", style={
+                                "color": "white",
+                                "textAlign": "center",
+                                "fontWeight": "bold"
+                            }),
+                            html.H5(id="var_ca", style={
+                                "textAlign": "center",
+                                "fontWeight": "bold"
+                            })
+                        ]),
+                        style=style_carte_kpi
                     ),
                     md=6
                 ),
-
-                #  creation de la colonne carte ventes
+                 # deuxième carte KPI pour le nombre de ventes
                 dbc.Col(
                     dbc.Card(
                         dbc.CardBody([
-                            html.P("December"),
-                            html.H6("Nombre de ventes", style={"fontWeight": "bold"}),
-                            html.H1(id="carte_nb"),
-                            html.H5(id="var_nb")
-                        ])
+                            html.P("Décembre", style={
+                                "color": "white",
+                                "textAlign": "center",
+                                "marginBottom": "5px"
+                            }),
+                            html.H6("Nombre de ventes", style={
+                                "fontWeight": "bold",
+                                "color": "white",
+                                "textAlign": "center"
+                            }),
+                            html.H1(id="carte_nb", style={
+                                "color": "white",
+                                "textAlign": "center",
+                                "fontWeight": "bold"
+                            }),
+                            html.H5(id="var_nb", style={
+                                "textAlign": "center",
+                                "fontWeight": "bold"
+                            })
+                        ]),
+                        style=style_carte_kpi
                     ),
                     md=6
                 )
-            ], className="mb-3"),
-
-            # colonne top 10
+            ], className="mb-4"),
+             # carte pour le top 10 des ventes
             dbc.Card(
                 dbc.CardBody([
-                    html.H4("Fréquence des 10 meilleures ventes"),
+                    html.Div("Fréquence des 10 meilleures ventes", style=style_titre_section),
                     dcc.Graph(id="graph_top10")
-                ])
+                ]),
+                style={"borderRadius": "25px", "border": "none", "boxShadow": "0 4px 10px rgba(0,0,0,0.15)"}
             )
         ], md=5),
 
-        #   Partie droite de la page
+        #ici on a la partie droite pour le graphe d'évolution du CA et la table des ventes
         dbc.Col([
 
-            #  courbe CA
             dbc.Card(
                 dbc.CardBody([
-                    html.H4("Évolution du chiffre d'affaire par semaine"),
+                    html.Div("Évolution du chiffre d'affaire par semaine", style=style_titre_section),
                     dcc.Graph(id="graph_ca")
-                ])
+                ]),
+                style={"borderRadius": "25px", "border": "none", "boxShadow": "0 4px 10px rgba(0,0,0,0.15)"}
             ),
-
+             # je mets un petit espace entre les deux cartes
             html.Br(),
 
-            # table de ventes 
             dbc.Card(
                 dbc.CardBody([
-                    html.H4("Table des 100 dernières ventes"),
+                    html.Div("Table des 100 dernières ventes", style=style_titre_section),
                     dash_table.DataTable(
                         id="table_ventes",
                         page_size=10,
                         style_table={"overflowX": "auto"},
-                        style_cell={"textAlign": "center"},
-                        style_header={"fontWeight": "bold"}
+                        style_cell={
+                            "textAlign": "center",
+                            "padding": "10px"
+                        },
+                        style_header={
+                            "fontWeight": "bold",
+                            "backgroundColor": BLEU_NUIT,
+                            "color": "white"
+                        }
                     )
-                ])
+                ]),
+                # je mets un style plus léger pour la carte de la table
+                style={"borderRadius": "25px", "border": "none", "boxShadow": "0 4px 10px rgba(0,0,0,0.15)"}
             )
         ], md=7)
 
     ])
-], fluid=True, style={"backgroundColor": "#0b1f3a", "minHeight": "100vh"})
+], fluid=True, style={"backgroundColor": "#0b1f3a", "minHeight": "100vh", "padding": "20px"})
 
-
+# je définis les callback pour mettre à jour tous les éléments du dashboard en fonction de la zone sélectionnée
 @app.callback(
     Output("carte_ca", "children"),
     Output("var_ca", "children"),
@@ -298,45 +397,45 @@ app.layout = dbc.Container([
 )
 def mettre_a_jour(zone):
 
-    # colonne filtre des données
+    # filtre des données
     if zone == "All":
         dff = df.copy()
     else:
         dff = df[df["Location"] == zone].copy()
 
-    # colonne carte CA décembre
+    # carte CA décembre
     ca_dec = ca_par_mois(dff, 12)
     ca_nov = ca_par_mois(dff, 11)
     diff_ca = ca_dec - ca_nov
 
-    # colonne carte nombre décembre
+    # carte nombre décembre
     nb_dec = len(dff[dff["Month"] == 12])
     nb_nov = len(dff[dff["Month"] == 11])
     diff_nb = nb_dec - nb_nov
 
-    # colonne texte variation du chiffre d'affaire 
+    # texte variation CA
     if diff_ca < 0:
         texte_ca = "▼ " + str(round(diff_ca, 0))
-        style_ca = {"color": "red"}
+        style_ca = {"color": "#ff6b6b", "textAlign": "center", "fontWeight": "bold"}
     else:
         texte_ca = "▲ " + str(round(diff_ca, 0))
-        style_ca = {"color": "green"}
+        style_ca = {"color": "#7CFC98", "textAlign": "center", "fontWeight": "bold"}
 
-    # colonne texte variation nombre
+    # texte variation nombre
     if diff_nb < 0:
         texte_nb = "▼ " + str(diff_nb)
-        style_nb = {"color": "red"}
+        style_nb = {"color": "#ff6b6b", "textAlign": "center", "fontWeight": "bold"}
     else:
         texte_nb = "▲ " + str(diff_nb)
-        style_nb = {"color": "green"}
+        style_nb = {"color": "#7CFC98", "textAlign": "center", "fontWeight": "bold"}
 
-    # colonne graphe top 10
+    # graphe top 10
     fig_top10 = barplot_top10_ventes(dff[dff["Month"] == 12])
 
-    # colonne graphe évolution CA
+    # graphe évolution CA
     fig_ca = plot_evolution_chiffre_affaire(dff)
 
-    # colonne table des ventes
+    # table des ventes
     table = dff.sort_values("Transaction_Date", ascending=False).head(100).copy()
 
     colonnes_table = [
@@ -353,4 +452,4 @@ def mettre_a_jour(zone):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run(debug=True)
