@@ -1,12 +1,18 @@
 
 
+# TP1 de LY Néné Gallé etudiante M1-ECAP
+# création d'un dashboard de vente pour une boutique fictive "ECAP Boutique" 
+# Professeur : Mr Abdoul Razac Sane 
+# librairies utilisées : pandas, plotly, dash, dash_bootstrap_components
+
+
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, dash_table, Input, Output
 import dash_bootstrap_components as dbc
 
 
-# data
+# Jeu de données 
 df = pd.read_csv("data.csv")
 
 # colonnes utiles
@@ -17,7 +23,7 @@ cols_utiles = [
 cols_utiles = [c for c in cols_utiles if c in df.columns]
 df = df[cols_utiles].copy()
 
-# CustomerID
+# Client     
 if "CustomerID" in df.columns:
     df["CustomerID"] = df["CustomerID"].fillna(0).astype(int)
 
@@ -41,7 +47,7 @@ df["Week"] = df["Transaction_Date"].dt.to_period("W").dt.start_time
 locations = sorted(df["Location"].dropna().unique().tolist())
 
 
-# fonctions
+# on dénit les fonctions de calculs et graphiques ( Vu en cours) 
 def frequence_meilleure_vente(data, top=10, ascending=False):
     result = (
         data.groupby("Product_Category")["Quantity"]
@@ -175,7 +181,7 @@ def plot_ventes_mois(data):
     fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
     return fig
 
-
+# conception du dashbord interactif 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 app.title = "ECAP Boutique"
@@ -184,15 +190,15 @@ app.layout = dbc.Container([
 
     # ligne titre + filtre
     dbc.Row([
-        # colonne titre
+        #  titre
         dbc.Col(
-            html.H3("ECAP Store", style={"fontWeight": "bold", "marginTop": "10px"}),
+            html.H3("ECAP Boutique", style={"fontWeight": "bold", "marginTop": "10px", "color": "white"}),
             md=6
         ),
 
-        # colonne filtre zone
+        # filtre zone
         dbc.Col([
-            html.Label("Choisissez une zone"),
+            html.Label("Choisissez une zone", style={"color": "white"}),
             dcc.Dropdown(
                 id="zone",
                 options=[{"label": "All", "value": "All"}] + [{"label": x, "value": x} for x in locations],
@@ -204,16 +210,17 @@ app.layout = dbc.Container([
 
     dbc.Row([
 
-        # colonne gauche
+        # Partie Gauche de la page 
         dbc.Col([
 
-            # colonne cartes
+            #  cartes
             dbc.Row([
-                # colonne carte CA
+                # carte CA
                 dbc.Col(
                     dbc.Card(
                         dbc.CardBody([
                             html.P("December"),
+                            html.H6("Chiffre d'affaires", style={"fontWeight": "bold"}),
                             html.H1(id="carte_ca"),
                             html.H5(id="var_ca")
                         ])
@@ -221,11 +228,12 @@ app.layout = dbc.Container([
                     md=6
                 ),
 
-                # colonne carte ventes
+                #  creation de la colonne carte ventes
                 dbc.Col(
                     dbc.Card(
                         dbc.CardBody([
                             html.P("December"),
+                            html.H6("Nombre de ventes", style={"fontWeight": "bold"}),
                             html.H1(id="carte_nb"),
                             html.H5(id="var_nb")
                         ])
@@ -243,10 +251,10 @@ app.layout = dbc.Container([
             )
         ], md=5),
 
-        # colonne droite
+        #   Partie droite de la page
         dbc.Col([
 
-            # colonne courbe CA
+            #  courbe CA
             dbc.Card(
                 dbc.CardBody([
                     html.H4("Évolution du chiffre d'affaire par semaine"),
@@ -256,7 +264,7 @@ app.layout = dbc.Container([
 
             html.Br(),
 
-            # colonne table
+            # table de ventes 
             dbc.Card(
                 dbc.CardBody([
                     html.H4("Table des 100 dernières ventes"),
@@ -272,7 +280,7 @@ app.layout = dbc.Container([
         ], md=7)
 
     ])
-], fluid=True)
+], fluid=True, style={"backgroundColor": "#0b1f3a", "minHeight": "100vh"})
 
 
 @app.callback(
@@ -306,7 +314,7 @@ def mettre_a_jour(zone):
     nb_nov = len(dff[dff["Month"] == 11])
     diff_nb = nb_dec - nb_nov
 
-    # colonne texte variation CA
+    # colonne texte variation du chiffre d'affaire 
     if diff_ca < 0:
         texte_ca = "▼ " + str(round(diff_ca, 0))
         style_ca = {"color": "red"}
